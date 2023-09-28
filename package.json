@@ -1,0 +1,22 @@
+{
+  "name": "com.an.unity",
+  "version": "1.0.0",
+  "displayName": "ANUnity",
+  "description": "AN Unity Tools",
+  "unity": "2022.2",
+  "unityRelease": "0b5",
+  "documentationUrl": "",
+  "changelogUrl": "",
+  "licensesUrl": "",
+  "dependencies": {
+
+ },
+ "keywords": [
+
+  ],
+  "author": {
+    "name": "AN",
+    "email": "547975141@qq.com0",
+    "url": ""
+  }
+}
