@@ -16,25 +16,54 @@ namespace AN
 
         private static bool darkModeEnabled = true;
 
+        private const string kCallOnceKey = "ANUnityDarkModeCallOnceKey";
+        
         [InitializeOnLoadMethod]
         static void Init()
         {
             AssemblyReloadEvents.beforeAssemblyReload += BeforeAssemblyReload;
             AssemblyReloadEvents.afterAssemblyReload += AfterAssemblyReload;
             EditorApplication.quitting += OnEditorQuitting;
+            
+            EditorApplication.playModeStateChanged += OnEditorPlayModeStateChanged;
+            
             // EditorApplication.update += OnEditorUpdate;
             
             FindMainWindowHandle();
-            
-            EditorApplication.delayCall += () =>
+            darkModeEnabled = EditorGUIUtility.isProSkin;
+
+            if (!EditorPrefs.HasKey(kCallOnceKey) || !EditorPrefs.GetInt(kCallOnceKey).Equals(1))
             {
-                darkModeEnabled = EditorGUIUtility.isProSkin;
-                FindMainWindowHandle();
-                InitDarkMode();
-                SetWndProc();
-                SetDarkMode(darkModeEnabled, false);
-                SetWindowDarkMode(mainWindow, darkModeEnabled);
-            };
+                // do once
+
+                EditorApplication.delayCall += () =>
+                {
+                    FindMainWindowHandle();
+                    InitDarkMode();
+                    SetWndProc();
+                    SetDarkMode(darkModeEnabled, false);
+                    SetWindowDarkMode(mainWindow, darkModeEnabled);
+                };
+
+                EditorPrefs.SetInt(kCallOnceKey, 1);
+            }
+        }
+
+        private static void OnEditorPlayModeStateChanged(PlayModeStateChange change)
+        {
+            switch (change)
+            {
+                case PlayModeStateChange.EnteredPlayMode:
+                    ResetWndProc();
+                    break;
+                case PlayModeStateChange.ExitingPlayMode:
+                    EditorApplication.delayCall += () =>
+                    {
+                        SetWndProc();
+                        SetWindowDarkMode(mainWindow, darkModeEnabled);
+                    };
+                    break;
+            }
         }
 
         static void AfterAssemblyReload()
@@ -55,6 +84,7 @@ namespace AN
         private static void OnEditorQuitting()
         {
             ResetWndProc();
+            EditorPrefs.DeleteKey(kCallOnceKey);
         }
         
         private static void OnEditorUpdate()
