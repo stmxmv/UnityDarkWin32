@@ -3,21 +3,19 @@ using System;
 using System.Runtime.InteropServices;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Assertions;
 using WLI = AN.Win32.WindowLongIndex;
 
 namespace AN
 {
     static class DarkMode
     {
-        static IntPtr mainWindow;
         static IntPtr defWndProc;
         
         static bool appFocused;
 
         private static bool darkModeEnabled = true;
 
-        private const string kCallOnceKey = "ANUnityDarkModeCallOnceKey";
-        
         [InitializeOnLoadMethod]
         static void Init()
         {
@@ -25,54 +23,31 @@ namespace AN
             AssemblyReloadEvents.afterAssemblyReload += AfterAssemblyReload;
             EditorApplication.quitting += OnEditorQuitting;
             
-            EditorApplication.playModeStateChanged += OnEditorPlayModeStateChanged;
-            
             // EditorApplication.update += OnEditorUpdate;
             
             FindMainWindowHandle();
             darkModeEnabled = EditorGUIUtility.isProSkin;
 
-            if (!EditorPrefs.HasKey(kCallOnceKey) || !EditorPrefs.GetInt(kCallOnceKey).Equals(1))
+            EditorApplication.delayCall += () =>
             {
-                // do once
-
-                EditorApplication.delayCall += () =>
-                {
-                    FindMainWindowHandle();
-                    InitDarkMode();
-                    SetWndProc();
-                    SetDarkMode(darkModeEnabled, false);
-                    SetWindowDarkMode(mainWindow, darkModeEnabled);
-                };
-
-                EditorPrefs.SetInt(kCallOnceKey, 1);
-            }
-        }
-
-        private static void OnEditorPlayModeStateChanged(PlayModeStateChange change)
-        {
-            switch (change)
-            {
-                case PlayModeStateChange.EnteredPlayMode:
-                    ResetWndProc();
-                    break;
-                case PlayModeStateChange.ExitingPlayMode:
-                    EditorApplication.delayCall += () =>
-                    {
-                        SetWndProc();
-                        SetWindowDarkMode(mainWindow, darkModeEnabled);
-                    };
-                    break;
-            }
+                darkModeEnabled = EditorGUIUtility.isProSkin;
+                FindMainWindowHandle();
+                SetWndProc();
+                InitDarkModeRoutineOnce(darkModeEnabled, false);
+            };
         }
 
         static void AfterAssemblyReload()
         {
             FindMainWindowHandle();
-            SetWndProc();
-            // force redraw menu bar
-            SetDarkMode(darkModeEnabled, false);
-            SetWindowDarkMode(mainWindow, darkModeEnabled);
+            
+            if (GetMainWindow() != IntPtr.Zero)
+            {
+                SetWndProc();
+                // force redraw menu bar
+                SetDarkMode(darkModeEnabled, false);
+                SetWindowDarkMode(GetMainWindow(), darkModeEnabled);
+            }
         }
         
         static void BeforeAssemblyReload()
@@ -84,7 +59,6 @@ namespace AN
         private static void OnEditorQuitting()
         {
             ResetWndProc();
-            EditorPrefs.DeleteKey(kCallOnceKey);
         }
         
         private static void OnEditorUpdate()
@@ -112,7 +86,7 @@ namespace AN
                 var title = Win32.GetWindowTitle(hWnd);
                 if (title.Contains(unityVersion))
                 {
-                    mainWindow = hWnd;
+                    SetMainWindow(hWnd);
                     //Debug.Log(title);
                     return false;
                 }
@@ -124,12 +98,16 @@ namespace AN
         {
             if (defWndProc == IntPtr.Zero)
             {
-                var targetWindow = mainWindow;
+                var targetWindow = GetMainWindow();
                 defWndProc = Win32.GetWindowLong(targetWindow, WLI.WindowProc);
-
+                
+                Assert.IsTrue(defWndProc != IntPtr.Zero);
+                
                 SetDefWndProc(defWndProc);
 
                 Win32.SetWindowLong(targetWindow, WLI.WindowProc, GetDarkModeWndProc());
+                
+                // Debug.Log("Set WndProc");
             }
         }
         
@@ -137,8 +115,10 @@ namespace AN
         {
             if (defWndProc != IntPtr.Zero)
             {
-                Win32.SetWindowLong(mainWindow, WLI.WindowProc, defWndProc);
+                Win32.SetWindowLong(GetMainWindow(), WLI.WindowProc, defWndProc);
                 defWndProc = IntPtr.Zero;
+                
+                // Debug.Log("Reset WndProc");
             }
         }
         
@@ -158,6 +138,9 @@ namespace AN
 
         [DllImport("ANUnityLib.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern void InitDarkMode();
+
+        [DllImport("ANUnityLib.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern void InitDarkModeRoutineOnce(bool useDark, bool fixDarkScrollbar);
         
         [DllImport("ANUnityLib.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern void SetDarkMode([MarshalAs(UnmanagedType.Bool)] bool useDark, [MarshalAs(UnmanagedType.Bool)] bool fixDarkScrollbar);
@@ -177,6 +160,12 @@ namespace AN
 
         [DllImport("ANUnityLib.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern void SetDefWndProc(IntPtr wndProc);
+
+        [DllImport("ANUnityLib.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern void SetMainWindow(IntPtr hWnd);
+
+        [DllImport("ANUnityLib.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern IntPtr GetMainWindow();
         
         [DllImport("kernel32.dll")]
         private static extern IntPtr LoadLibrary(string dllName);
