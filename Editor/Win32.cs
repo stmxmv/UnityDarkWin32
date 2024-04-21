@@ -146,7 +146,14 @@ namespace AN
         [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool SetWindowPos(IntPtr hWnd, int hWndInsertAfter, int x, int y, int cx, int cy, SetWindowPosFlags uFlags);
 
+        [DllImport("Comctl32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool SetWindowSubclass(IntPtr hWnd, IntPtr pfnSubclass, IntPtr uIdSubclass, IntPtr dwRefData);
 
+        [DllImport("Comctl32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool RemoveWindowSubclass(IntPtr hWnd, IntPtr pfnSubclass, IntPtr uIdSubclass);
+        
         [Flags]
         public enum SetWindowPosFlags
         {
